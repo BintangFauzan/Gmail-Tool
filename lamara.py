@@ -104,24 +104,33 @@ def gabung_pdf(surat: Path, berkas: Path, tujuan: Path) -> None:
 
 
 def isi_surat_untuk_email(dokumen: Path) -> str:
-    """Ambil isi surat mulai dari salam, tanpa kepala alamat atau tanda tangan."""
+    """Ambil tujuan surat dan isi surat, tanpa tanggal atau tanda tangan."""
     paragraf = [p.text.strip() for p in Document(str(dokumen)).paragraphs]
     try:
         awal = next(i for i, teks in enumerate(paragraf)
-                    if teks.casefold() == "dengan hormat,")
+                    if teks.casefold() == "kepada")
+        salam = next(i for i, teks in enumerate(paragraf[awal:], awal)
+                     if teks.casefold() == "dengan hormat,")
         akhir = next(i for i, teks in enumerate(paragraf[awal + 1:], awal + 1)
                      if teks.casefold() == "hormat saya,")
     except StopIteration as e:
-        raise ValueError("Batas salam atau tanda tangan tidak ditemukan di template surat.") from e
+        raise ValueError(
+            "Bagian tujuan, salam, atau tanda tangan tidak ditemukan di template surat."
+        ) from e
 
-    isi = [teks for teks in paragraf[awal:akhir] if teks]
+    if salam >= akhir:
+        raise ValueError("Urutan bagian tujuan, salam, dan tanda tangan tidak valid.")
+
+    isi = paragraf[awal:akhir]
+    while isi and not isi[-1]:
+        isi.pop()
     if not isi:
         raise ValueError("Isi surat untuk body email kosong.")
-    return "\n\n".join(isi)
+    return "\n".join(isi)
 
 
 def buat_draf_email(data: dict, nama_file: str, dokumen_surat: Path) -> dict:
-    """Draf email dengan body yang diambil dari isi surat lamaran."""
+    """Draf email dengan tujuan dan isi dari surat lamaran."""
     perusahaan = data["perusahaan"].strip()
     posisi = data["posisi"].strip()
     email_tujuan = data.get("email_tujuan", "").strip()
